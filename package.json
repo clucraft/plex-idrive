@@ -1,0 +1,14 @@
+{
+  "name": "plex-idrive",
+  "version": "0.1.0",
+  "description": "Drive-In: an unofficial Plex client for the BMW iDrive 7 (MGU) head unit, installed through the MGU Store",
+  "private": true,
+  "license": "SEE LICENSE IN NOTICE",
+  "scripts": {
+    "test": "node test/run.js",
+    "test:node8": "node tools/node8.js test/run.js",
+    "shots": "node tools/shots.js",
+    "mock": "node tools/mock-plex.js",
+    "icon": "node tools/make-icon.js"
+  }
+}

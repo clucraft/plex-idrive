@@ -1,0 +1,6 @@
+# Unix line endings in the working tree on every OS: the build runs on the head unit
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pem text eol=lf
+native/clucraft-plex/tvh-player binary
