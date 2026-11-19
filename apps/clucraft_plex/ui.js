@@ -143,7 +143,9 @@ function createUi(o) {
         if (sub) wrap(cv, sub, 19, Math.min(w, 900), M, 3).forEach((l, i) => cv.text(l, x + w / 2, y + 40 + i * 27, 19, C.grey, center(M)));
         (lines || []).forEach((l, i) => cv.text(fit(cv, String(l), 14, w - 40, M), x + w / 2, y + 140 + i * 20, 14, C.dim, center(M)));
     }
-    const spinner = (cv, cx, cy) => { const a = (now() / 4) % 360; cv.arc(cx, cy, 15, 20, a, a + 270, C.accent, { round: true }); };
+    // (in twelve steps a second, not one for every frame the renderer can take: a frame that is the same as the last
+    // is not sent, and the head unit has a film to decode)
+    const spinner = (cv, cx, cy) => { const a = (Math.floor(now() / 80) * 24) % 360; cv.arc(cx, cy, 15, 20, a, a + 270, C.accent, { round: true }); };
 
     /* ---------- the rail ---------- */
     function rail(cv, A) {
@@ -581,7 +583,8 @@ function createUi(o) {
         // the bottom: the bar, the times, the buttons
         const by = A.bottom - 150;
         cv.gradientRect(0, by - 70, W, fullH - by + 70, [[0, A_(C.black, 0)], [0.5, A_(C.black, 0.72)], [1, A_(C.black, 0.9)]]);
-        const pos = S.position(), d = p.duration || 0;
+        // (whole seconds: the bar then changes once a second, and no frame is sent in between)
+        const pos = Math.floor(S.position()), d = p.duration || 0;
         const bx = A.x + 96, bw = A.right - A.x - 192, bary = by + 14;
         cv.text(hms(pos), bx - 14, bary + 9, 18, C.text, right(B));
         cv.text(d ? hms(d) : '', bx + bw + 14, bary + 9, 18, C.grey, M);

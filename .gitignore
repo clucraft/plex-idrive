@@ -1,6 +1,8 @@
 node_modules/
-# tools/node8.js downloads
+# tools/node8.js downloads; tools/emu.js puts the emulator together here
 .cache/
+# the app kit's emulator, fetched by tools/emu.js
+/vendor/
 # car packages contain BMW's SDK: never commit or publish them
 dist/
 *.mgu

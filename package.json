@@ -7,6 +7,7 @@
   "scripts": {
     "test": "node test/run.js",
     "test:node8": "node tools/node8.js test/run.js",
+    "emu": "node tools/emu.js",
     "shots": "node tools/shots.js",
     "mock": "node tools/mock-plex.js",
     "icon": "node tools/make-icon.js"

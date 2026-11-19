@@ -188,6 +188,38 @@ test('player: a stream\'s bytes that arrive before its start are kept, an old st
 
 /* ---------------- the service ---------------- */
 
+test('car audio: a route that fails is tried again at its own pace, not on every poll of the app, and said once', async () => {
+    const { createCarAudio } = require(path.join(ROOT, 'apps', 'clucraft_plex', 'caraudio'));
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'drivein-audio-'));
+    let up = false, tries = 0, conns = [];
+    const signals = {
+        proxy: async (iface) => { if (!up) { tries++; throw new Error('no audio manager'); } return { iface }; },
+        call: async (p, m, a) => {
+            if (m === 'getListMainConnections') return conns.slice();
+            if (m === 'connect') { conns.push({ mainConnectionID: 7, sourceID: a.sourceID, sinkID: a.sinkID }); return { amError: 'E_OK', mainConnectionID: 7 }; }
+            if (m === 'disconnect') { conns = conns.filter((c) => c.mainConnectionID !== a.mainConnectionID); return { amError: 'E_OK' }; }
+            return {};
+        },
+    };
+    const said = [], log = { info: (s) => said.push('i ' + s), warn: (s) => said.push('w ' + s) };
+    const au = createCarAudio(signals, log, path.join(tmp, 'audio.json'), { retryMs: 120 });
+    // the app asks after every answer of the service, a few times a second
+    for (let i = 0; i < 25; i++) { au.want(true); await sleep(4); }
+    assert.strictEqual(tries, 1, 'one attempt for 25 polls, not ' + tries);
+    await sleep(420);
+    assert.ok(tries >= 3 && tries <= 5, 'tried again every 120 ms: ' + tries);
+    assert.deepStrictEqual(said.filter((s) => s[0] === 'w'), ['w car audio: no audio manager'], 'the same failure is logged once');
+    assert.strictEqual(au.state().error, 'no audio manager');
+    up = true;
+    await sleep(300);
+    assert.deepStrictEqual([au.state().connected, au.state().error, conns.length], [true, null, 1]);
+    for (let i = 0; i < 10; i++) { au.want(true); await sleep(4); }
+    assert.strictEqual(conns.length, 1, 'connected once');
+    au.want(false);
+    await sleep(80);
+    assert.deepStrictEqual([au.state().connected, conns.length], [false, 0]);
+});
+
 async function linked(o) {
     const st = await createStage(Object.assign({ linked: false, filmSeconds: 40 }, o || {}));
     const cmd = (m) => st.svc.command(m);
@@ -731,6 +763,25 @@ test('main.js: starts on a stand-in head unit from the staged package; the wheel
 });
 
 /* ---------------- the repository ---------------- */
+
+test('emulator: what tools/emu.js changes in the kit is there to change, once', () => {
+    const E = require(path.join(ROOT, 'tools', 'emu'));
+    assert.ok(/^[0-9a-f]{40}$/.test(E.EMU_COMMIT), 'the emulator is pinned to a commit');
+    // this repository's own file among them
+    const mine = E.ADAPT.filter((a) => a[0] === 'kit/runtime/renderd.js');
+    assert.strictEqual(mine.length, 1);
+    assert.strictEqual(fs.readFileSync(path.join(ROOT, mine[0][0]), 'utf8').split(mine[0][2]).length, 2, 'renderd.js has the line once');
+    // the kit's emulator files, when a checkout is at hand (npm run emu fetched one, or IDRIVE7_APPS names one)
+    const kit = [process.env.IDRIVE7_APPS, path.join(ROOT, 'vendor', 'idrive7-apps')].filter(Boolean).find((d) => fs.existsSync(path.join(d, 'kit', 'tools', 'emu.js')));
+    for (const [file, what, from, to] of E.ADAPT) {
+        assert.ok(from !== to && to.length > from.length - 40 && what, file);
+        if (!kit || file === 'kit/runtime/renderd.js') continue;
+        assert.strictEqual(fs.readFileSync(path.join(kit, file), 'utf8').replace(/\r\n/g, '\n').split(from).length, 2, file + ': ' + what);
+    }
+    // the app and its backend find each other by a port, and the stand-in SDK says what it is
+    const src = fs.readFileSync(path.join(ROOT, 'tools', 'emu.js'), 'utf8');
+    assert.ok(/PLEXD_SOCK: backendPort/.test(src) && /NOT BMW's SDK/.test(src));
+});
 
 test('repository: the versions and manifests agree; nothing of BMW\'s and no account is in it', () => {
     const j = (f) => JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'));

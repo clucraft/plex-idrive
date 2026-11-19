@@ -6,7 +6,7 @@
 
 *Drawn on a PC by `npm run shots`, with an invented library and abstract posters. The app on the head unit's 1920 x 720 screen looks the same; the HMI's own title strip and back arrow are stand-ins here.*
 
-> **Status: builds and passes its tests on a PC. Not yet run on a car, and not yet run against a real Plex server.** The service is tested against a stand-in for plex.tv and a Plex Media Server, with a stand-in for the player. What only a car and a real server can show is listed under [What still needs a car](#what-still-needs-a-car). Expect a first evening of fixing.
+> **Status: runs in the app kit's emulator and passes its tests on a PC. Not yet run on a car, and not yet run against a real Plex server.** The app runs in the [idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) kit's emulator, drawn by the car's draw engine, with the service against a stand-in for plex.tv and a Plex Media Server and a stand-in for the player. What only a car and a real server can show is listed under [What still needs a car](#what-still-needs-a-car). Expect a first evening of fixing.
 
 > **Parked by default.** The picture shows while the car is parked. Out of P, or moving, the picture goes off and the sound plays on. A setting lets a passenger watch while driving; it does nothing until its disclaimer has been accepted, with the car parked. See [Video while driving](#video-while-driving).
 
@@ -108,14 +108,37 @@ npm test
 npm run shots
 ```
 
+- `npm run emu` is the app in the kit's emulator: see below.
 - `npm test` runs the service against a stand-in for plex.tv and a server (`tools/mock-plex.js`) with a stand-in player, drives the app's pages by their touch targets, and starts `main.js` on a stand-in head unit from the package the kit's build stages.
 - `npm run test:node8` runs the same on Node 8.17.0, the Node.js line the head unit runs apps on. It downloads that Node once from nodejs.org and checks it against the release's checksums.
 - `npm run shots` draws every page into `docs/` as a PNG.
 - `npm run mock` runs the stand-in server by itself, for trying the service by hand.
 
+### In the emulator
+
+```bash
+npm run emu
+```
+
+Then open **http://localhost:8077**. This also needs **Python 3** and **git**.
+
+![The emulator page: the head unit's screen with the app's home page on the left; the app's buttons, the vehicle signals and the settings on the right](docs/emulator.png)
+
+This is the emulator of the [idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) app kit: the app as the head unit runs it, with the kit's real runtime, drawn in the browser by the car's GPU draw engine built as WebAssembly. Behind it run the real Drive-In service, against the stand-in plex.tv and server with the invented library, and the stand-in player (`tools/dev-backend.js`).
+
+- **Mouse = touch.** The wheel or `[` `]` turn the controller, `Enter` presses it, `Backspace` is BACK, `H` is HOME, `O` opens the app again.
+- **Get a code** signs in at once: nobody has to type the code anywhere.
+- **Vehicle signals, Manual**: the speed slider and the gear selector are what the app's driving gate reads. `P` and 0 km/h is parked. Anything else takes the picture away and locks the disclaimer's switch, as in the car.
+- **The player page says *Waiting for the picture***: the emulator's renderer shows no video, and nothing decodes one here. The film's time, pause, skip, the progress bar, the next episode and the driving gate all work. ***No sound: emulator: no SOME/IP*** is the emulator having no audio manager to ask.
+- Saving a file under `apps/clucraft_plex/` builds and restarts the app while the page stays open. Settings and the accepted disclaimer are kept in `.cache/emu/preview/emu/clucraft_plex/`.
+
+![The player in the emulator with the gear selector in D at 60 km/h: the picture is off while driving](docs/emulator-driving.png)
+
+The emulator is not in this repository. `npm run emu` fetches the kit once into `vendor/idrive7-apps` (not committed), at the commit named in `tools/emu.js`; `node tools/emu.js --kit <folder>` uses a checkout you already have. This repository's `kit/` is another branch of the same kit, so the tool puts the two together in `.cache/emu` and teaches the emulator's stand-in head unit three things this kit has (the list is at the top of `tools/emu.js`). The Windows parts (a named pipe for the renderer, `python` for Python) are the ones [swarm-idrive](https://github.com/clucraft/swarm-idrive) uses; they were not run on Windows for this app.
+
 ## What still needs a car
 
-None of this could be run where the app was written. Each is something to look at on the first evening, with the place to look.
+None of this could be run where the app was written, and the emulator cannot show it either. Each is something to look at on the first evening, with the place to look.
 
 - **A real Plex server's transcoder.** The requests follow what other open clients send (the universal transcoder's HLS, a `generic` client profile limited to H.264 8-bit and stereo AAC). Whether your server answers the decision and the playlist as expected shows in the service's log lines `hls: N segments, ... from segment K` and in the player page's error text. Both shapes of playlist (the whole film, or only what follows the resume point) are handled.
 - **The player on the real GPU and speakers.** `tvh-player` is the IPTV service's player, unchanged; there it plays live MPEG-TS on its stdin, and a Plex HLS stream is MPEG-TS segments handed over the same way. It was not run here. The service log's `player N: {"ev":"open" ...}` line names the codecs it found; `decoder` and `audio` lines say whether the GPU and the sound device took them.
@@ -164,7 +187,7 @@ native/tvh-player/      the player's source (as M850i-amn/idrive7-apps has it), 
 kit/                    the MGU App Kit's build files and runtime (a copy; kit/UPSTREAM.json names its commit)
 mgu-repo.json           tells the MGU Store what is here and how to build the app
 test/                   run.js (the tests), fake-player.js (the stand-in player)
-tools/                  mock-plex.js, stage.js, shots.js, make-icon.js, node8.js
+tools/                  emu.js and dev-backend.js (the emulator), mock-plex.js, stage.js, shots.js, make-icon.js, node8.js
 docs/                   screenshots
 ```
 
@@ -175,5 +198,6 @@ See [NOTICE](NOTICE) for every part and where it comes from.
 - The app, the tools and the tests are MIT ([LICENSE](LICENSE)).
 - The service and the player are GPL-3.0-or-later (`native/clucraft-plex/LICENSE`): the player is M850i-amn's IPTV player, from aurelmarius' TVH Player, on Moonride's and Robert Nisipeanu's decoder and FFmpeg.
 - `kit/` is the MGU App Kit as M850i-amn's repository has it, MIT.
+- The emulator (`npm run emu`) is the idrive7-apps kit's; its draw engine is GPL-3.0-or-later. It is fetched when you run it and is not in this repository.
 - BMW's app SDK is BMW's. It is not in this repository and may not be published.
 - Not affiliated with or endorsed by Plex, Inc. or BMW AG.

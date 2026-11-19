@@ -23,7 +23,8 @@ const AM = 'org.genivi.am.commandinterface.CommandControl';
 const AMR = 'org.genivi.am.routinginterface.RoutingControlObserver';
 const SRC = 287, SINK = 1024;
 
-function createCarAudio(signals, log, file) {
+function createCarAudio(signals, log, file, o) {
+    const RETRY_MS = (o && o.retryMs) || 5000;
     const st = { on: false, connected: false, taken: false, error: null };
     let p = null, r = null, id = null, q = Promise.resolve(), retry = null;
     const boot = () => { try { return fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(); } catch (e) { return null; } };
@@ -70,17 +71,28 @@ function createCarAudio(signals, log, file) {
         if (!(await on287()).length) await avail(false);
         log.info('car audio: off');
     }
+    let said = null;
     function step() {
-        q = q.then(() => (st.on ? connect() : disconnect())).then(() => { st.error = null; }, (e) => { st.error = String(e.message || e); log.warn('car audio: ' + st.error); });
+        q = q.then(() => (st.on ? connect() : disconnect())).then(() => { st.error = null; said = null; }, (e) => {
+            st.error = String(e.message || e);
+            // (a failure that repeats is logged once: it is tried again every 5 s for as long as the film plays)
+            if (st.error !== said) { said = st.error; log.warn('car audio: ' + st.error); }
+        });
         return q;
     }
+    const settled = () => (st.on ? st.connected : !st.connected);
     function want(on) {
         on = !!on;
-        if (on === st.on && (on ? st.connected : !st.connected)) return;
+        // asked on every poll of the app: only a change starts something (a call that failed is the retry's)
+        if (on === st.on) return;
         st.on = on;
-        clearInterval(retry); retry = null;
+        clearInterval(retry);
         // while another app holds the speakers (or a call failed), look again every 5 s
-        if (on) retry = setInterval(() => { if (st.on && !st.connected) step(); }, 5000);
+        retry = setInterval(() => {
+            if (!settled()) step();
+            else if (!st.on) { clearInterval(retry); retry = null; }      // off and hung up: nothing left to look at
+        }, RETRY_MS);
+        if (retry.unref) retry.unref();
         step();
     }
     return { want, state: () => Object.assign({}, st) };
